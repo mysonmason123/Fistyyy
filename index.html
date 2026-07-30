@@ -175,7 +175,8 @@
   <div class="panel" id="muncher">
     <div class="card">
       <div class="score" id="muncherScore">Score: 0</div>
-      <canvas id="muncherCanvas" width="420" height="460"></canvas>
+      <div class="status" id="muncherStatus">Munch it up!</div>
+      <canvas id="muncherCanvas" width="560" height="520"></canvas>
       <div class="hint">arrow keys / wasd to move</div>
       <div class="btnrow"><button class="reset" onclick="muncherReset()">Restart</button></div>
     </div>
@@ -669,17 +670,42 @@ const mapRows = [
 "#...........  .............#",
 "############################"
 ];
-let mGrid, muncher, mScore, mAlive;
+let mGrid, muncher, mScore, mAlive, mGhosts;
 function isWallM(x, y){
   if(y < 0 || y >= mGrid.length || x < 0 || x >= mGrid[0].length) return true;
   return mGrid[y][x] === '#';
 }
+function findOpenTileM(cx, cy){
+  if(mGrid[cy] && mGrid[cy][cx] !== '#') return {x:cx, y:cy};
+  for(let radius=1; radius<mGrid.length; radius++){
+    for(let dy=-radius; dy<=radius; dy++){
+      for(let dx=-radius; dx<=radius; dx++){
+        const x=cx+dx, y=cy+dy;
+        if(mGrid[y] && mGrid[y][x] !== '#' && mGrid[y][x] !== undefined) return {x,y};
+      }
+    }
+  }
+  return {x:1,y:1};
+}
+const GHOST_COLORS = ['#ff5c7a','#b28fff','#5cff8f','#ffd35c','#5cd6c8'];
 function muncherReset(){
   mGrid = mapRows.map(row => row.split(''));
-  muncher = { x: 14, y: 18, dx: 0, dy: 0, nextDx: 0, nextDy: 0 };
+  // force a solid wall around the entire boundary regardless of the map string
+  for(let x=0; x<mGrid[0].length; x++){ mGrid[0][x] = '#'; mGrid[mGrid.length-1][x] = '#'; }
+  for(let y=0; y<mGrid.length; y++){ mGrid[y][0] = '#'; mGrid[y][mGrid[y].length-1] = '#'; }
+  const spawn = findOpenTileM(14, 18);
+  muncher = { x: spawn.x, y: spawn.y, dx: 0, dy: 0, nextDx: 0, nextDy: 0 };
   mScore = 0;
   mAlive = true;
   document.getElementById('muncherScore').textContent = 'Score: 0';
+  document.getElementById('muncherStatus').textContent = 'Munch it up!';
+  const ghostSpawns = [
+    findOpenTileM(13,11), findOpenTileM(14,11), findOpenTileM(13,12),
+    findOpenTileM(14,12), findOpenTileM(13,9)
+  ];
+  mGhosts = ghostSpawns.map((s,i) => ({
+    x:s.x, y:s.y, dx:0, dy:0, color:GHOST_COLORS[i]
+  }));
 }
 document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
@@ -688,6 +714,22 @@ document.addEventListener('keydown', e => {
   if(k === 'arrowleft' || k === 'a'){ muncher.nextDx=-1; muncher.nextDy=0; }
   if(k === 'arrowright' || k === 'd'){ muncher.nextDx=1; muncher.nextDy=0; }
 });
+function ghostChooseDir(g){
+  const dirs=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+  let options = dirs.filter(d => !isWallM(g.x+d.x, g.y+d.y) && !(d.x===-g.dx && d.y===-g.dy));
+  if(!options.length) options = dirs.filter(d => !isWallM(g.x+d.x, g.y+d.y));
+  if(!options.length) return {x:0,y:0};
+  // 65% chase the player (greedy shortest distance), 35% wander randomly
+  if(Math.random() < 0.65){
+    options.sort((a,b) => {
+      const da = Math.abs((g.x+a.x)-muncher.x) + Math.abs((g.y+a.y)-muncher.y);
+      const db = Math.abs((g.x+b.x)-muncher.x) + Math.abs((g.y+b.y)-muncher.y);
+      return da - db;
+    });
+    return options[0];
+  }
+  return options[Math.floor(Math.random()*options.length)];
+}
 function stepMuncher(){
   if(!mAlive) return;
   if(!isWallM(muncher.x + muncher.nextDx, muncher.y + muncher.nextDy)){
@@ -704,6 +746,15 @@ function stepMuncher(){
     mScore += cell === 'o' ? 5 : 1;
     document.getElementById('muncherScore').textContent = 'Score: ' + mScore;
   }
+  mGhosts.forEach(g => {
+    const d = ghostChooseDir(g);
+    g.dx = d.x; g.dy = d.y;
+    g.x += g.dx; g.y += g.dy;
+    if(g.x === muncher.x && g.y === muncher.y){
+      mAlive = false;
+      document.getElementById('muncherStatus').textContent = 'Caught! Final score: ' + mScore;
+    }
+  });
 }
 function drawMuncher(){
   mCtx.fillStyle = '#000';
@@ -729,6 +780,22 @@ function drawMuncher(){
       }
     }
   }
+  mGhosts.forEach(g => {
+    mCtx.fillStyle = g.color;
+    const px = g.x*TILE, py = g.y*TILE;
+    mCtx.beginPath();
+    mCtx.arc(px+TILE/2, py+TILE/2-2, TILE/2-3, Math.PI, 0);
+    mCtx.lineTo(px+TILE-3, py+TILE-2);
+    mCtx.lineTo(px+TILE-8, py+TILE-6);
+    mCtx.lineTo(px+TILE/2, py+TILE-2);
+    mCtx.lineTo(px+8, py+TILE-6);
+    mCtx.lineTo(px+3, py+TILE-2);
+    mCtx.closePath();
+    mCtx.fill();
+    mCtx.fillStyle = '#fff';
+    mCtx.beginPath(); mCtx.arc(px+TILE/2-4, py+TILE/2-3, 2.5, 0, 7); mCtx.fill();
+    mCtx.beginPath(); mCtx.arc(px+TILE/2+4, py+TILE/2-3, 2.5, 0, 7); mCtx.fill();
+  });
   mCtx.fillStyle = '#ffe066';
   mCtx.beginPath();
   mCtx.arc(muncher.x*TILE+TILE/2, muncher.y*TILE+TILE/2, TILE/2-2, 0.25*Math.PI, 1.75*Math.PI);
