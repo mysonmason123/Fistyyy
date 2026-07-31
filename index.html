@@ -63,6 +63,7 @@
   .panel.active{display:block;animation:fadein .3s ease;}
   @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
   .card{max-width:520px;margin:0 auto;background:rgba(255,255,255,0.03);border:1px solid rgba(143,216,255,0.25);border-radius:16px;padding:24px;box-shadow:0 0 30px rgba(143,216,255,0.08);text-align:center;}
+  .card.wide-card{max-width:610px;}
   .status{margin-bottom:14px;font-size:15px;letter-spacing:1px;color:#dfefff;min-height:20px;}
   .diffrow{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:16px;}
   .diffLabel{font-size:11px;color:#7d94a8;letter-spacing:1px;text-transform:uppercase;margin-right:4px;}
@@ -173,7 +174,7 @@
   </div>
 
   <div class="panel" id="muncher">
-    <div class="card">
+    <div class="card wide-card">
       <div class="score" id="muncherScore">Score: 0</div>
       <div class="status" id="muncherStatus">Munch it up!</div>
       <canvas id="muncherCanvas" width="560" height="520"></canvas>
@@ -1129,20 +1130,69 @@ function arScoreInkMove(bot, d){
   blocked.add(nx+','+ny);
   const space = inkOpenSpace(nx, ny, blocked, 60);
   const owner = iOwner[ny]?.[nx];
-  const claimBonus = (owner === bot.id) ? 3 : (owner === 0 ? 1.5 : (owner === 1 ? 2.5 : 0.5));
+  // the longer the bot has been out on a trail, the more it wants to head home and seal the claim
+  const outLen = bot.trail.length;
+  const homePull = Math.min(outLen / 5, 4); // ramps up to a strong pull the longer it's been out
+  const claimBonus = (owner === bot.id)
+    ? (0.5 + homePull)
+    : (owner === 0 ? 3 : (owner === 1 ? 2.5 : 2));
   const edgeSafety = (nx > 1 && nx < I_COLS-2 && ny > 1 && ny < I_ROWS-2) ? 1 : -2;
-  return space * 0.15 + claimBonus + edgeSafety;
+  // extra pull toward unclaimed/enemy territory scaled by how deep the bot currently sits inside its own land
+  const insideOwnDepth = outLen === 0 ? inkDistanceFromEdgeOfOwnLand(bot) : 0;
+  const ventureBonus = (owner !== bot.id) ? insideOwnDepth * 0.3 : 0;
+  // once far out, also nudge toward the general direction of home
+  let homeDirBonus = 0;
+  if(outLen > 6){
+    const homeX = bot.trail[0].x, homeY = bot.trail[0].y;
+    const curDist = Math.abs(bot.x-homeX)+Math.abs(bot.y-homeY);
+    const newDist = Math.abs(nx-homeX)+Math.abs(ny-homeY);
+    homeDirBonus = (curDist - newDist) * (outLen / 8);
+  }
+  // hunt the player if they're within reach — close the gap to threaten cutting their trail
+  let huntBonus = 0;
+  const distToPlayer = Math.abs(bot.x-player.x)+Math.abs(bot.y-player.y);
+  if(distToPlayer < 14){
+    const curD = Math.abs(bot.x-player.x)+Math.abs(bot.y-player.y);
+    const newD = Math.abs(nx-player.x)+Math.abs(ny-player.y);
+    huntBonus = (curD - newD) * 0.6;
+  }
+  return space * 0.15 + claimBonus + edgeSafety + ventureBonus + homeDirBonus + huntBonus;
+}
+function inkDistanceFromEdgeOfOwnLand(bot){
+  // rough measure: how many of the 8 neighbor cells around the bot are also its own land
+  let count = 0;
+  for(let dy=-1; dy<=1; dy++) for(let dx=-1; dx<=1; dx++){
+    if(dx===0 && dy===0) continue;
+    const x=bot.x+dx, y=bot.y+dy;
+    if(inBoundsI(x,y) && iOwner[y][x] === bot.id) count++;
+  }
+  return count;
 }
 function respawnBot(bot){
-  let spot, tries = 0, ok = false;
-  while(tries < 200){
-    spot = { x: Math.floor(Math.random()*(I_COLS-6))+2, y: Math.floor(Math.random()*(I_ROWS-6))+2 };
-    tries++;
-    ok = true;
-    for(let y=spot.y-1;y<=spot.y+1 && ok;y++) for(let x=spot.x-1;x<=spot.x+1 && ok;x++){
-      if(inBoundsI(x,y) && iOwner[y][x] === 1) ok = false;
+  const candidates = [];
+  for(let cy=3; cy<I_ROWS-3; cy++){
+    for(let cx=3; cx<I_COLS-3; cx++){
+      let free = true;
+      for(let y=cy-1;y<=cy+1 && free;y++) for(let x=cx-1;x<=cx+1 && free;x++){
+        if(iOwner[y][x] === 1) free = false;
+      }
+      if(free) candidates.push({x:cx, y:cy});
     }
-    if(ok) break;
+  }
+  let spot;
+  if(candidates.length){
+    spot = candidates[Math.floor(Math.random()*candidates.length)];
+  } else {
+    // player owns almost everything: fall back to the least player-dense spot on the map
+    let best = null, bestCount = Infinity;
+    for(let cy=3; cy<I_ROWS-3; cy+=2){
+      for(let cx=3; cx<I_COLS-3; cx+=2){
+        let count = 0;
+        for(let y=cy-1;y<=cy+1;y++) for(let x=cx-1;x<=cx+1;x++) if(iOwner[y][x]===1) count++;
+        if(count < bestCount){ bestCount = count; best = {x:cx,y:cy}; }
+      }
+    }
+    spot = best || {x:2,y:2};
   }
   bot.x = spot.x; bot.y = spot.y; bot.dir = {x:1,y:0}; bot.trail = []; bot.alive = true;
   for(let y=spot.y-1;y<=spot.y+1;y++) for(let x=spot.x-1;x<=spot.x+1;x++) if(inBoundsI(x,y) && iOwner[y][x] !== 1) iOwner[y][x] = bot.id;
