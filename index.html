@@ -83,6 +83,7 @@
   #tttLineCanvas{background:transparent;border:none;box-shadow:none;margin:0;}
   #c4LineCanvas{background:transparent;border:none;box-shadow:none;margin:0;}
   .score{text-align:center;margin:10px 0;font-size:14px;letter-spacing:1px;color:#cfe7f7;}
+  .best{text-align:center;margin:-6px 0 10px;font-size:12px;letter-spacing:1px;color:var(--accent);text-shadow:0 0 8px rgba(143,216,255,0.4);}
 
 </style>
 </head>
@@ -167,6 +168,7 @@
         <button class="diffBtn" data-diff="hard" onclick="galaxaSetDiff('hard',this)">Hard</button>
       </div>
       <div class="score" id="galaxaScore">Score: 0 &nbsp; Lives: 3</div>
+      <div class="best" id="galaxaBest">Best: 0</div>
       <canvas id="galaxaCanvas" width="420" height="460"></canvas>
       <div class="hint">arrow keys / a-d to move · space to shoot</div>
       <div class="btnrow"><button class="reset" onclick="galaxaReset()">Restart</button></div>
@@ -176,6 +178,7 @@
   <div class="panel" id="muncher">
     <div class="card wide-card">
       <div class="score" id="muncherScore">Score: 0</div>
+      <div class="best" id="muncherBest">Best: 0</div>
       <div class="status" id="muncherStatus">Munch it up!</div>
       <canvas id="muncherCanvas" width="560" height="520"></canvas>
       <div class="hint">arrow keys / wasd to move</div>
@@ -186,6 +189,7 @@
   <div class="panel" id="snake">
     <div class="card">
       <div class="score" id="snakeScore">Score: 0</div>
+      <div class="best" id="snakeBest">Best: 0</div>
       <canvas id="snakeCanvas" width="420" height="420"></canvas>
       <div class="hint">arrow keys / wasd to move · orbs are worth more than dots · click restart if you crash</div>
       <div class="btnrow"><button class="reset" onclick="snakeReset()">Restart</button></div>
@@ -201,6 +205,7 @@
         <button class="diffBtn" data-diff="hard" onclick="arenaSetDiff('hard',this)">Hard</button>
       </div>
       <div class="score" id="arenaScore">Score: 0</div>
+      <div class="best" id="arenaBest">Best: 0</div>
       <canvas id="arenaCanvas" width="420" height="420"></canvas>
       <div class="hint">arrow keys / wasd — eat orbs to grow, run an AI snake's head into your body to take it out</div>
       <div class="btnrow"><button class="reset" onclick="arenaReset()">Restart</button></div>
@@ -218,6 +223,20 @@
 </div>
 
 <script>
+function nexusUpdateBest(key, score, elId){
+  const stored = parseInt(localStorage.getItem('nexus_best_' + key) || '0', 10);
+  const best = Math.max(stored, score);
+  if(best > stored) localStorage.setItem('nexus_best_' + key, best);
+  const el = document.getElementById(elId);
+  if(el) el.textContent = 'Best: ' + best;
+  return best;
+}
+function nexusInitBest(key, elId){
+  const stored = parseInt(localStorage.getItem('nexus_best_' + key) || '0', 10);
+  const el = document.getElementById(elId);
+  if(el) el.textContent = 'Best: ' + stored;
+}
+
 /* ---------- starfield background ---------- */
 const sf = document.getElementById('starfield');
 const sctx = sf.getContext('2d');
@@ -699,6 +718,7 @@ function muncherReset(){
   mScore = 0;
   mAlive = true;
   document.getElementById('muncherScore').textContent = 'Score: 0';
+  nexusInitBest('muncher','muncherBest');
   document.getElementById('muncherStatus').textContent = 'Munch it up!';
   const ghostSpawns = [
     findOpenTileM(13,11), findOpenTileM(14,11), findOpenTileM(13,12),
@@ -746,6 +766,7 @@ function stepMuncher(){
     mGrid[muncher.y][muncher.x] = ' ';
     mScore += cell === 'o' ? 5 : 1;
     document.getElementById('muncherScore').textContent = 'Score: ' + mScore;
+    nexusUpdateBest('muncher', mScore, 'muncherBest');
   }
   mGhosts.forEach(g => {
     const d = ghostChooseDir(g);
@@ -821,6 +842,7 @@ function snakeReset(){
   sOrbTimer = 0;
   placeFood();
   document.getElementById('snakeScore').textContent = 'Score: 0';
+  nexusInitBest('snake','snakeBest');
 }
 function randomEmptyTile(){
   let ok = false, t;
@@ -857,6 +879,7 @@ function stepSnake(){
   }
   if(!grew) snake.pop();
   document.getElementById('snakeScore').textContent = 'Score: ' + sScore;
+    nexusUpdateBest('snake', sScore, 'snakeBest');
   if(!sOrb){
     sOrbTimer++;
     if(sOrbTimer > 60){ sOrb = randomEmptyTile(); sOrbTimer = 0; }
@@ -922,6 +945,7 @@ function arenaReset(){
   arScore = 0;
   arAlive = true;
   document.getElementById('arenaScore').textContent = 'Score: 0';
+  nexusInitBest('arena','arenaBest');
 }
 document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
@@ -959,21 +983,31 @@ function stepArena(){
   if(outOfBounds || arPlayer.body.some(s=>s.x===phead.x&&s.y===phead.y)){
     arAlive = false;
     document.getElementById('arenaScore').textContent = 'Score: ' + arScore + ' — you crashed! click restart';
+    nexusUpdateBest('arena', arScore, 'arenaBest');
     return;
   }
   let grew = false;
   const orbIdx = arOrbs.findIndex(o => o.x===phead.x && o.y===phead.y);
   if(orbIdx !== -1){ arOrbs.splice(orbIdx,1); arScore += 2; grew = true; }
-  // check collision with bots (player head into bot body = bot dies; bot head into player body = player dies)
+  // check collision with bots (player head into bot body = bot dies; player head into bot's head = both die)
   arBots.forEach(bot => {
     if(!bot.alive) return;
-    if(bot.body.some(s=>s.x===phead.x&&s.y===phead.y)){
+    const headOn = bot.body[0].x===phead.x && bot.body[0].y===phead.y;
+    const hitBody = !headOn && bot.body.some(s=>s.x===phead.x&&s.y===phead.y);
+    if(headOn){
+      bot.alive = false;
+      arAlive = false;
+      bot.body.forEach(seg => arOrbs.push({x:seg.x,y:seg.y}));
+      document.getElementById('arenaScore').textContent = 'Score: ' + arScore + ' — head-on collision! click restart';
+      nexusUpdateBest('arena', arScore, 'arenaBest');
+    } else if(hitBody){
       bot.alive = false;
       arScore += 20;
       bot.body.forEach(seg => arOrbs.push({x:seg.x,y:seg.y}));
       grew = true;
     }
   });
+  if(!arAlive) return;
   arPlayer.body.unshift(phead);
   if(!grew) arPlayer.body.pop();
 
@@ -988,6 +1022,7 @@ function stepArena(){
         // head-on collision with player head: player dies too
         arAlive = false;
         document.getElementById('arenaScore').textContent = 'Score: ' + arScore + ' — head-on collision! click restart';
+      nexusUpdateBest('arena', arScore, 'arenaBest');
       }
       bot.alive = false;
       bot.body.forEach(seg => arOrbs.push({x:seg.x,y:seg.y}));
@@ -1009,6 +1044,7 @@ function stepArena(){
     }
   });
   if(arAlive) document.getElementById('arenaScore').textContent = 'Score: ' + arScore;
+  nexusUpdateBest('arena', arScore, 'arenaBest');
 }
 function drawArena(){
   arCtx.fillStyle = '#000';
@@ -1311,6 +1347,7 @@ function galaxaReset(){
   }
   gScore = 0; gLives = 3; gAlive = true;
   document.getElementById('galaxaScore').textContent = 'Score: 0   Lives: 3';
+  nexusInitBest('galaxa','galaxaBest');
 }
 document.addEventListener('keydown', e => {
   gKeys[e.key.toLowerCase()] = true;
@@ -1370,6 +1407,7 @@ function stepGalaxa(){
     }
   });
   document.getElementById('galaxaScore').textContent = `Score: ${gScore}   Lives: ${Math.max(gLives,0)}`;
+  nexusUpdateBest('galaxa', gScore, 'galaxaBest');
   if(gAliens.every(a => !a.alive)) galaxaReset();
   if(!gAlive) document.getElementById('galaxaScore').textContent += ' — game over, click restart';
 }
