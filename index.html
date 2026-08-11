@@ -566,13 +566,19 @@ function tttBotMove(){
       }
     }
   }
-  let best = -Infinity, bestMove = empty[0];
+  // guaranteed rule: if this is O's very first move and X opened in a corner, always take center
+  const CORNERS = [0,2,6,8];
+  if(filled.length === 1 && CORNERS.includes(filled[0])){
+    if(tttBoard[4] === '') return 4;
+  }
+  let best = -Infinity, bestMoves = [];
   for(const i of empty){
     const copy = tttBoard.slice(); copy[i]='O';
     const score = tttMinimax(copy, 0, false);
-    if(score > best){ best = score; bestMove = i; }
+    if(score > best){ best = score; bestMoves = [i]; }
+    else if(score === best){ bestMoves.push(i); }
   }
-  return bestMove;
+  return bestMoves[Math.floor(Math.random()*bestMoves.length)];
 }
 function tttMinimax(b, depth, isMax){
   const w = tttWinner(b)?.player;
