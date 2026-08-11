@@ -83,6 +83,19 @@
   canvas{display:block;margin:0 auto;background:#000;border-radius:10px;border:1px solid rgba(143,216,255,0.3);box-shadow:0 0 30px rgba(143,216,255,0.15);}
   #tttLineCanvas{background:transparent;border:none;box-shadow:none;margin:0;}
   #c4LineCanvas{background:transparent;border:none;box-shadow:none;margin:0;}
+  .viewToggle{display:flex;justify-content:center;gap:8px;margin:8px 0 6px;}
+  .viewBtn{background:rgba(255,255,255,0.04);border:1px solid rgba(143,216,255,0.3);color:#9fb8ca;border-radius:8px;padding:5px 12px;font-size:11px;letter-spacing:1px;cursor:pointer;}
+  .viewBtn.active{background:rgba(143,216,255,0.22);color:#fff;border-color:var(--accent);}
+  .touchpad{display:none;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px 56px;gap:6px;justify-content:center;margin:14px auto 0;}
+  body.mobile-mode .touchpad.active-game{display:grid;}
+  .touchpad button{background:rgba(143,216,255,0.12);border:1px solid rgba(143,216,255,0.4);border-radius:10px;color:#eaf6ff;font-size:20px;cursor:pointer;}
+  .touchpad button:active{background:rgba(143,216,255,0.35);}
+  .tp-up{grid-column:2;grid-row:1;} .tp-left{grid-column:1;grid-row:2;} .tp-right{grid-column:3;grid-row:2;} .tp-down{grid-column:2;grid-row:3;}
+  .galaxaControls{display:none;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;}
+  body.mobile-mode .galaxaControls.active-game{display:flex;}
+  .gCtrlBtn{background:rgba(143,216,255,0.12);border:1px solid rgba(143,216,255,0.4);border-radius:10px;color:#eaf6ff;font-size:20px;width:56px;height:56px;cursor:pointer;touch-action:none;user-select:none;}
+  .gCtrlBtn.gFire{width:96px;font-size:14px;letter-spacing:1px;background:rgba(255,120,120,0.15);border-color:rgba(255,120,120,0.5);}
+  .gCtrlBtn:active{background:rgba(143,216,255,0.35);}
   .shopBtn{display:block;margin:0 auto 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(143,216,255,0.35);color:#eaf6ff;border-radius:8px;padding:7px 14px;font-size:12px;letter-spacing:0.5px;cursor:pointer;}
   .shopBtn:hover{background:rgba(143,216,255,0.15);}
   .inkShop{display:none;flex-wrap:wrap;justify-content:center;gap:8px;max-width:340px;margin:0 auto 12px;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(143,216,255,0.25);border-radius:10px;}
@@ -105,6 +118,10 @@
 <body>
 <canvas id="starfield"></canvas>
 <div class="wrap">
+  <div class="viewToggle">
+    <button class="viewBtn active" id="viewDesktopBtn" onclick="setDeviceView('desktop')">🖥️ Desktop</button>
+    <button class="viewBtn" id="viewMobileBtn" onclick="setDeviceView('mobile')">📱 Mobile</button>
+  </div>
   <h1><span class="secretN" onclick="toggleWinSecret()" title="psst...">N</span>EXUS ARCADE</h1>
   <div class="winSecret" id="winSecret">
     <div class="winSecretInner">
@@ -199,6 +216,11 @@
       <div class="score" id="galaxaScore">Score: 0 &nbsp; Lives: 3</div>
       <div class="best" id="galaxaBest">Best: 0</div>
       <canvas id="galaxaCanvas" width="420" height="460"></canvas>
+      <div class="galaxaControls" data-game="galaxa">
+        <button class="gCtrlBtn" onpointerdown="gKeys['arrowleft']=true" onpointerup="gKeys['arrowleft']=false" onpointerleave="gKeys['arrowleft']=false">◀</button>
+        <button class="gCtrlBtn gFire" onpointerdown="gKeys[' ']=true" onpointerup="gKeys[' ']=false" onpointerleave="gKeys[' ']=false">🔥 FIRE</button>
+        <button class="gCtrlBtn" onpointerdown="gKeys['arrowright']=true" onpointerup="gKeys['arrowright']=false" onpointerleave="gKeys['arrowright']=false">▶</button>
+      </div>
       <div class="hint">arrow keys / a-d to move · space to shoot</div>
       <div class="btnrow"><button class="reset" onclick="galaxaReset()">Restart</button></div>
     </div>
@@ -210,6 +232,12 @@
       <div class="best" id="muncherBest">Best: 0</div>
       <div class="status" id="muncherStatus">Munch it up!</div>
       <canvas id="muncherCanvas" width="560" height="520"></canvas>
+      <div class="touchpad" data-game="muncher">
+        <button class="tp-up" onclick="nexusTouchDir('muncher',0,-1)">▲</button>
+        <button class="tp-left" onclick="nexusTouchDir('muncher',-1,0)">◀</button>
+        <button class="tp-right" onclick="nexusTouchDir('muncher',1,0)">▶</button>
+        <button class="tp-down" onclick="nexusTouchDir('muncher',0,1)">▼</button>
+      </div>
       <div class="hint">arrow keys / wasd to move</div>
       <div class="btnrow"><button class="reset" onclick="muncherReset()">Restart</button></div>
     </div>
@@ -220,6 +248,12 @@
       <div class="score" id="snakeScore">Score: 0</div>
       <div class="best" id="snakeBest">Best: 0</div>
       <canvas id="snakeCanvas" width="420" height="420"></canvas>
+      <div class="touchpad" data-game="snake">
+        <button class="tp-up" onclick="nexusTouchDir('snake',0,-1)">▲</button>
+        <button class="tp-left" onclick="nexusTouchDir('snake',-1,0)">◀</button>
+        <button class="tp-right" onclick="nexusTouchDir('snake',1,0)">▶</button>
+        <button class="tp-down" onclick="nexusTouchDir('snake',0,1)">▼</button>
+      </div>
       <div class="hint">arrow keys / wasd to move · orbs are worth more than dots · click restart if you crash</div>
       <div class="btnrow"><button class="reset" onclick="snakeReset()">Restart</button></div>
     </div>
@@ -236,6 +270,12 @@
       <div class="score" id="arenaScore">Score: 0</div>
       <div class="best" id="arenaBest">Best: 0</div>
       <canvas id="arenaCanvas" width="420" height="420"></canvas>
+      <div class="touchpad" data-game="snakearena">
+        <button class="tp-up" onclick="nexusTouchDir('arena',0,-1)">▲</button>
+        <button class="tp-left" onclick="nexusTouchDir('arena',-1,0)">◀</button>
+        <button class="tp-right" onclick="nexusTouchDir('arena',1,0)">▶</button>
+        <button class="tp-down" onclick="nexusTouchDir('arena',0,1)">▼</button>
+      </div>
       <div class="hint">arrow keys / wasd — eat orbs to grow, run an AI snake's head into your body to take it out</div>
       <div class="btnrow"><button class="reset" onclick="arenaReset()">Restart</button></div>
     </div>
@@ -247,6 +287,12 @@
       <button class="shopBtn" onclick="toggleInkShop()">🎨 Shop — pick your colour</button>
       <div class="inkShop" id="inkShop"></div>
       <canvas id="inkCanvas" width="480" height="480"></canvas>
+      <div class="touchpad" data-game="ink">
+        <button class="tp-up" onclick="nexusTouchDir('ink',0,-1)">▲</button>
+        <button class="tp-left" onclick="nexusTouchDir('ink',-1,0)">◀</button>
+        <button class="tp-right" onclick="nexusTouchDir('ink',1,0)">▶</button>
+        <button class="tp-down" onclick="nexusTouchDir('ink',0,1)">▼</button>
+      </div>
       <div class="hint">arrow keys / wasd — paint territory, return to your zone to claim, run through a bot's trail to kill it and take its land, don't cross your own trail</div>
       <div class="btnrow"><button class="reset" onclick="inkReset()">Restart</button></div>
     </div>
@@ -350,13 +396,9 @@ document.querySelectorAll('.tab').forEach(tab => {
     if(activeGc) activeGc.classList.add('active-game');
   });
 });
-// show the tic-tac-toe pad state correctly on first load (no dpad needed there, but keep others in sync)
 document.querySelectorAll('.touchpad').forEach(tp => tp.classList.remove('active-game'));
 
-/* ---------- device view toggle ---------- */
-function toggleWinSecret(){
-  document.getElementById('winSecret').classList.toggle('open');
-}
+/* ---------- device view toggle (controls only — no sizing changes) ---------- */
 function setDeviceView(mode){
   document.body.classList.toggle('mobile-mode', mode === 'mobile');
   document.getElementById('viewDesktopBtn').classList.toggle('active', mode === 'desktop');
@@ -383,6 +425,10 @@ function nexusTouchDir(game, dx, dy){
     if(dx !== 0 && player.dir.x === 0){ player.nextDir = {x:dx,y:0}; }
     if(dy !== 0 && player.dir.y === 0){ player.nextDir = {x:0,y:dy}; }
   }
+}
+
+function toggleWinSecret(){
+  document.getElementById('winSecret').classList.toggle('open');
 }
 
 /* ---------- Tic Tac Toe (vs bot or 2 player) ---------- */
