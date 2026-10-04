@@ -129,12 +129,13 @@
     <div class="winSecretInner">
       <strong>Hard Mode Tic-Tac-Toe — the one way to win:</strong>
       <ol>
-        <li>Take any corner.</li>
-        <li>Bot takes the center.</li>
-        <li>Take the corner diagonally opposite your first move.</li>
-        <li>Bot takes a corner (not the correct edge defense).</li>
-        <li>Take either remaining corner — this creates a fork (two winning lines at once).</li>
-        <li>Bot can only block one — win with the other.</li>
+        <li>Take the center square first.</li>
+        <li>Bot takes an edge (top, bottom, left, or right — not a corner).</li>
+        <li>Take the top-left corner.</li>
+        <li>Bot takes the bottom-right corner.</li>
+        <li>Take the middle-left edge square.</li>
+        <li>Bot is forced into a losing spot.</li>
+        <li>Take the middle-right edge square to win.</li>
       </ol>
       <span class="winSecretClose" onclick="toggleWinSecret()">close</span>
     </div>
@@ -161,6 +162,9 @@
     <div class="tab" data-panel="snakearena">Snake Arena</div>
     <div class="tab" data-panel="ink">Ink Wars</div>
     <div class="tab" data-panel="galaxa">Galaxa</div>
+    <div class="tab" data-panel="flappy">Flappy Nexus</div>
+    <div class="tab" data-panel="t2048">2048</div>
+    <div class="tab" data-panel="breakout">Breakout</div>
   </div>
 
   <div class="panel active" id="ttt">
@@ -225,6 +229,51 @@
       </div>
       <div class="hint">arrow keys / a-d to move · space to shoot</div>
       <div class="btnrow"><button class="reset" onclick="galaxaReset()">Restart</button></div>
+    </div>
+  </div>
+
+  <div class="panel" id="flappy">
+    <div class="card">
+      <div class="score" id="flappyScore">Score: 0</div>
+      <div class="best" id="flappyBest">Best: 0</div>
+      <canvas id="flappyCanvas" width="360" height="480"></canvas>
+      <div class="galaxaControls" data-game="flappy">
+        <button class="gCtrlBtn gFire" style="width:140px;" onclick="flappyFlap()">🪽 FLAP</button>
+      </div>
+      <div class="hint">click/tap the game, or press space/up, to flap</div>
+      <div class="btnrow"><button class="reset" onclick="flappyReset()">Restart</button></div>
+    </div>
+  </div>
+
+  <div class="panel" id="t2048">
+    <div class="card">
+      <div class="score" id="t2048Score">Score: 0</div>
+      <div class="best" id="t2048Best">Best: 0</div>
+      <div style="position:relative;width:340px;margin:0 auto;">
+        <canvas id="t2048Canvas" width="340" height="340"></canvas>
+      </div>
+      <div class="touchpad" data-game="t2048">
+        <button class="tp-up" onclick="t2048Move('up')">▲</button>
+        <button class="tp-left" onclick="t2048Move('left')">◀</button>
+        <button class="tp-right" onclick="t2048Move('right')">▶</button>
+        <button class="tp-down" onclick="t2048Move('down')">▼</button>
+      </div>
+      <div class="hint">arrow keys / wasd to slide tiles — matching numbers merge</div>
+      <div class="btnrow"><button class="reset" onclick="t2048Reset()">Restart</button></div>
+    </div>
+  </div>
+
+  <div class="panel" id="breakout">
+    <div class="card">
+      <div class="score" id="breakoutScore">Score: 0 &nbsp; Lives: 3</div>
+      <div class="best" id="breakoutBest">Best: 0</div>
+      <canvas id="breakoutCanvas" width="400" height="440"></canvas>
+      <div class="galaxaControls" data-game="breakout">
+        <button class="gCtrlBtn" onpointerdown="brKeys['arrowleft']=true" onpointerup="brKeys['arrowleft']=false" onpointerleave="brKeys['arrowleft']=false">◀</button>
+        <button class="gCtrlBtn" onpointerdown="brKeys['arrowright']=true" onpointerup="brKeys['arrowright']=false" onpointerleave="brKeys['arrowright']=false">▶</button>
+      </div>
+      <div class="hint">arrow keys / a-d, or mouse, to move the paddle</div>
+      <div class="btnrow"><button class="reset" onclick="breakoutReset()">Restart</button></div>
     </div>
   </div>
 
@@ -548,20 +597,16 @@ function tttBotMove(){
     }
     return empty[Math.floor(Math.random()*empty.length)];
   }
-  // hard: true minimax (unbeatable) — EXCEPT one deliberate trapdoor: if X opens with a
-  // corner, O takes center, then X takes the OPPOSITE corner, O deliberately takes a
-  // corner instead of the correct edge defense, letting X force the classic fork.
+  // hard: true minimax (unbeatable) — EXCEPT one deliberate trapdoor, reached only by this
+  // exact sequence: X opens CENTER, O deliberately takes an edge (a real mistake) instead of
+  // a corner, X takes a corner, O plays its only truly-optimal reply naturally, X takes a
+  // specific edge, O is deliberately forced into a losing reply, and X finishes the win.
   const filled = tttBoard.map((v,i)=>v?i:-1).filter(i=>i!==-1);
-  const CORNER_PAIRS = {0:8, 8:0, 2:6, 6:2};
-  if(filled.length === 3 && tttBoard[4] === 'O'){
-    const xCells = filled.filter(i => tttBoard[i]==='X');
-    if(xCells.length === 2){
-      const [a,b] = xCells;
-      if(CORNER_PAIRS[a] === b){
-        const remainingCorners = [0,2,6,8].filter(i => tttBoard[i]==='');
-        if(remainingCorners.length) return remainingCorners[0];
-      }
-    }
+  if(filled.length === 1 && tttBoard[4] === 'X'){
+    return 1; // deliberate mistake: edge instead of the correct corner
+  }
+  if(filled.length === 5 && tttBoard[4]==='X' && tttBoard[1]==='O' && tttBoard[0]==='X' && tttBoard[8]==='O' && tttBoard[3]==='X' && tttBoard[2]===''){
+    return 2; // deliberate mistake: forced into a losing reply
   }
   // guaranteed rule: if this is O's very first move and X opened in a corner, always take center
   const CORNERS = [0,2,6,8];
@@ -1598,6 +1643,301 @@ function drawGalaxa(){
 }
 galaxaReset();
 setInterval(() => { stepGalaxa(); drawGalaxa(); }, 30);
+
+/* ---------- Flappy Nexus ---------- */
+const flapCanvas = document.getElementById('flappyCanvas');
+const flapCtx = flapCanvas.getContext('2d');
+const FLAP_W = flapCanvas.width, FLAP_H = flapCanvas.height;
+let flappyBird, flappyPipes, flappyScore, flappyAlive, flappyFrame;
+function flappyReset(){
+  flappyBird = { x: 70, y: FLAP_H/2, vy: 0, r: 13 };
+  flappyPipes = [];
+  flappyScore = 0;
+  flappyAlive = true;
+  flappyFrame = 0;
+  document.getElementById('flappyScore').textContent = 'Score: 0';
+  nexusInitBest('flappy','flappyBest');
+}
+function flappyFlap(){
+  if(!flappyAlive){ flappyReset(); return; }
+  flappyBird.vy = -6.2;
+}
+flapCanvas.addEventListener('click', flappyFlap);
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if((k === ' ' || k === 'arrowup') && document.getElementById('flappy').classList.contains('active')){
+    e.preventDefault();
+    flappyFlap();
+  }
+});
+function stepFlappy(){
+  if(!flappyAlive) return;
+  flappyFrame++;
+  flappyBird.vy += 0.35;
+  flappyBird.y += flappyBird.vy;
+  if(flappyFrame % 95 === 0){
+    const gapY = 70 + Math.random()*(FLAP_H-220);
+    const gapSize = 130;
+    flappyPipes.push({ x: FLAP_W, gapY, gapSize, passed:false, w:52 });
+  }
+  flappyPipes.forEach(p => p.x -= 2.6);
+  flappyPipes = flappyPipes.filter(p => p.x > -60);
+  flappyPipes.forEach(p => {
+    if(!p.passed && p.x + p.w < flappyBird.x){
+      p.passed = true;
+      flappyScore++;
+      document.getElementById('flappyScore').textContent = 'Score: ' + flappyScore;
+      nexusUpdateBest('flappy', flappyScore, 'flappyBest');
+    }
+  });
+  if(flappyBird.y - flappyBird.r < 0 || flappyBird.y + flappyBird.r > FLAP_H){
+    flappyAlive = false;
+  }
+  flappyPipes.forEach(p => {
+    const inX = flappyBird.x + flappyBird.r > p.x && flappyBird.x - flappyBird.r < p.x + p.w;
+    if(inX){
+      const inGap = flappyBird.y - flappyBird.r > p.gapY && flappyBird.y + flappyBird.r < p.gapY + p.gapSize;
+      if(!inGap) flappyAlive = false;
+    }
+  });
+  if(!flappyAlive){
+    nexusUpdateBest('flappy', flappyScore, 'flappyBest');
+  }
+}
+function drawFlappy(){
+  flapCtx.fillStyle = '#000';
+  flapCtx.fillRect(0,0,FLAP_W,FLAP_H);
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8fd8ff';
+  flapCtx.fillStyle = accent;
+  flapCtx.shadowColor = accent;
+  flapCtx.shadowBlur = 12;
+  flappyPipes.forEach(p => {
+    flapCtx.fillRect(p.x, 0, p.w, p.gapY);
+    flapCtx.fillRect(p.x, p.gapY + p.gapSize, p.w, FLAP_H - (p.gapY + p.gapSize));
+  });
+  flapCtx.shadowBlur = 16;
+  flapCtx.fillStyle = '#ffe066';
+  flapCtx.beginPath();
+  flapCtx.arc(flappyBird.x, flappyBird.y, flappyBird.r, 0, 7);
+  flapCtx.fill();
+  flapCtx.shadowBlur = 0;
+  if(!flappyAlive){
+    flapCtx.fillStyle = 'rgba(0,0,0,0.6)';
+    flapCtx.fillRect(0, FLAP_H/2-40, FLAP_W, 80);
+    flapCtx.fillStyle = '#fff';
+    flapCtx.font = '18px Segoe UI';
+    flapCtx.textAlign = 'center';
+    flapCtx.fillText('Crashed! Score: ' + flappyScore, FLAP_W/2, FLAP_H/2 - 8);
+    flapCtx.font = '13px Segoe UI';
+    flapCtx.fillText('click / tap / FLAP to try again', FLAP_W/2, FLAP_H/2 + 16);
+    flapCtx.textAlign = 'left';
+  }
+}
+flappyReset();
+setInterval(() => { stepFlappy(); drawFlappy(); }, 20);
+
+/* ---------- 2048 ---------- */
+const t2048Ctx = document.getElementById('t2048Canvas').getContext('2d');
+const T48_PAD = 10, T48_GAP = 8, T48_TILE = 74;
+let t2048Grid, t2048Score, t2048Over;
+const T48_COLORS = {
+  2:'#3a4a5c', 4:'#3a5a6c', 8:'#2f8fae', 16:'#2fa6ae', 32:'#5cd6c8',
+  64:'#5cff8f', 128:'#ffe066', 256:'#ffb168', 512:'#ff8fd6', 1024:'#b28fff', 2048:'#ffffff'
+};
+function t2048Reset(){
+  t2048Grid = Array.from({length:4}, () => Array(4).fill(0));
+  t2048Score = 0;
+  t2048Over = false;
+  document.getElementById('t2048Score').textContent = 'Score: 0';
+  nexusInitBest('t2048','t2048Best');
+  t2048AddTile(); t2048AddTile();
+  drawT2048();
+}
+function t2048AddTile(){
+  const empties = [];
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(t2048Grid[r][c]===0) empties.push([r,c]);
+  if(!empties.length) return;
+  const [r,c] = empties[Math.floor(Math.random()*empties.length)];
+  t2048Grid[r][c] = Math.random() < 0.9 ? 2 : 4;
+}
+function t2048SlideRow(row){
+  let vals = row.filter(x => x !== 0);
+  let merged = [];
+  for(let i=0;i<vals.length;i++){
+    if(i < vals.length-1 && vals[i] === vals[i+1]){
+      const m = vals[i]*2;
+      merged.push(m);
+      t2048Score += m;
+      i++;
+    } else merged.push(vals[i]);
+  }
+  while(merged.length < 4) merged.push(0);
+  return merged;
+}
+function t2048RotateCW(g){
+  const n = Array.from({length:4}, () => Array(4).fill(0));
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++) n[c][3-r] = g[r][c];
+  return n;
+}
+function t2048Move(dir){
+  if(t2048Over) return;
+  let g = t2048Grid.map(r=>r.slice());
+  let rotations = {up:3, right:2, down:1, left:0}[dir];
+  for(let i=0;i<rotations;i++) g = t2048RotateCW(g);
+  let changed = false;
+  const newG = g.map(row => {
+    const before = row.join(',');
+    const after = t2048SlideRow(row);
+    if(before !== after.join(',')) changed = true;
+    return after;
+  });
+  let result = newG;
+  for(let i=0;i<(4-rotations)%4;i++) result = t2048RotateCW(result);
+  if(changed){
+    t2048Grid = result;
+    t2048AddTile();
+    document.getElementById('t2048Score').textContent = 'Score: ' + t2048Score;
+    nexusUpdateBest('t2048', t2048Score, 't2048Best');
+    if(t2048CheckOver()){
+      t2048Over = true;
+    }
+  }
+  drawT2048();
+}
+function t2048CheckOver(){
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++){
+    if(t2048Grid[r][c] === 0) return false;
+    if(c<3 && t2048Grid[r][c] === t2048Grid[r][c+1]) return false;
+    if(r<3 && t2048Grid[r][c] === t2048Grid[r+1][c]) return false;
+  }
+  return true;
+}
+document.addEventListener('keydown', e => {
+  if(!document.getElementById('t2048').classList.contains('active')) return;
+  const k = e.key.toLowerCase();
+  if(k==='arrowup'||k==='w') t2048Move('up');
+  if(k==='arrowdown'||k==='s') t2048Move('down');
+  if(k==='arrowleft'||k==='a') t2048Move('left');
+  if(k==='arrowright'||k==='d') t2048Move('right');
+});
+function drawT2048(){
+  t2048Ctx.fillStyle = '#000';
+  t2048Ctx.fillRect(0,0,340,340);
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8fd8ff';
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++){
+    const x = T48_PAD + c*(T48_TILE+T48_GAP), y = T48_PAD + r*(T48_TILE+T48_GAP);
+    const val = t2048Grid[r][c];
+    t2048Ctx.fillStyle = val ? (T48_COLORS[val] || '#fff') : 'rgba(255,255,255,0.04)';
+    t2048Ctx.strokeStyle = 'rgba(143,216,255,0.3)';
+    t2048Ctx.lineWidth = 1;
+    t2048Ctx.beginPath();
+    t2048Ctx.roundRect ? t2048Ctx.roundRect(x,y,T48_TILE,T48_TILE,8) : t2048Ctx.rect(x,y,T48_TILE,T48_TILE);
+    t2048Ctx.fill();
+    t2048Ctx.stroke();
+    if(val){
+      t2048Ctx.fillStyle = val <= 4 ? '#eaf6ff' : '#0a0d16';
+      t2048Ctx.font = 'bold ' + (val >= 1000 ? 18 : 22) + 'px Segoe UI';
+      t2048Ctx.textAlign = 'center';
+      t2048Ctx.textBaseline = 'middle';
+      t2048Ctx.fillText(val, x+T48_TILE/2, y+T48_TILE/2+1);
+    }
+  }
+  if(t2048Over){
+    t2048Ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    t2048Ctx.fillRect(0,130,340,80);
+    t2048Ctx.fillStyle = '#fff';
+    t2048Ctx.font = '18px Segoe UI';
+    t2048Ctx.textAlign = 'center';
+    t2048Ctx.fillText('No moves left! Score: ' + t2048Score, 170, 170);
+  }
+}
+t2048Reset();
+
+/* ---------- Breakout ---------- */
+const brCanvas = document.getElementById('breakoutCanvas');
+const brCtx = brCanvas.getContext('2d');
+const BR_W = brCanvas.width, BR_H = brCanvas.height;
+let brKeys = {};
+let brPaddle, brBall, brBricks, brScore, brLives, brAlive;
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if(['arrowleft','arrowright','a','d'].includes(k)) brKeys[k==='a'?'arrowleft':k==='d'?'arrowright':k] = true;
+});
+document.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if(['arrowleft','arrowright','a','d'].includes(k)) brKeys[k==='a'?'arrowleft':k==='d'?'arrowright':k] = false;
+});
+brCanvas.addEventListener('mousemove', e => {
+  const rect = brCanvas.getBoundingClientRect();
+  const scale = BR_W / rect.width;
+  brPaddle.x = Math.max(0, Math.min(BR_W - brPaddle.w, (e.clientX - rect.left) * scale - brPaddle.w/2));
+});
+function breakoutReset(){
+  brPaddle = { x: BR_W/2 - 40, y: BR_H - 24, w: 80, h: 12, speed: 6 };
+  brBall = { x: BR_W/2, y: BR_H - 40, vx: 3.2, vy: -3.2, r: 7 };
+  brBricks = [];
+  const rows = 5, cols = 8, bw = (BR_W - 20) / cols, bh = 20;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    brBricks.push({ x: 10 + c*bw, y: 40 + r*(bh+6), w: bw-4, h: bh, alive:true });
+  }
+  brScore = 0; brLives = 3; brAlive = true;
+  document.getElementById('breakoutScore').textContent = 'Score: 0   Lives: 3';
+  nexusInitBest('breakout','breakoutBest');
+}
+function stepBreakout(){
+  if(!brAlive) return;
+  if(brKeys['arrowleft']) brPaddle.x -= brPaddle.speed;
+  if(brKeys['arrowright']) brPaddle.x += brPaddle.speed;
+  brPaddle.x = Math.max(0, Math.min(BR_W - brPaddle.w, brPaddle.x));
+  brBall.x += brBall.vx;
+  brBall.y += brBall.vy;
+  if(brBall.x - brBall.r < 0 || brBall.x + brBall.r > BR_W) brBall.vx *= -1;
+  if(brBall.y - brBall.r < 0) brBall.vy *= -1;
+  if(brBall.y + brBall.r > brPaddle.y && brBall.y - brBall.r < brPaddle.y + brPaddle.h &&
+     brBall.x > brPaddle.x && brBall.x < brPaddle.x + brPaddle.w && brBall.vy > 0){
+    brBall.vy *= -1;
+    const hitPos = (brBall.x - (brPaddle.x + brPaddle.w/2)) / (brPaddle.w/2);
+    brBall.vx = hitPos * 4.5;
+  }
+  brBricks.forEach(b => {
+    if(!b.alive) return;
+    if(brBall.x + brBall.r > b.x && brBall.x - brBall.r < b.x + b.w &&
+       brBall.y + brBall.r > b.y && brBall.y - brBall.r < b.y + b.h){
+      b.alive = false;
+      brBall.vy *= -1;
+      brScore += 10;
+      document.getElementById('breakoutScore').textContent = 'Score: ' + brScore + '   Lives: ' + brLives;
+      nexusUpdateBest('breakout', brScore, 'breakoutBest');
+    }
+  });
+  if(brBall.y - brBall.r > BR_H){
+    brLives--;
+    if(brLives <= 0){
+      brAlive = false;
+      document.getElementById('breakoutScore').textContent = 'Score: ' + brScore + '   Lives: 0 — click restart';
+      nexusUpdateBest('breakout', brScore, 'breakoutBest');
+    } else {
+      brBall = { x: BR_W/2, y: BR_H - 40, vx: 3.2, vy: -3.2, r: 7 };
+      document.getElementById('breakoutScore').textContent = 'Score: ' + brScore + '   Lives: ' + brLives;
+    }
+  }
+  if(brBricks.every(b => !b.alive)) breakoutReset();
+}
+function drawBreakout(){
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8fd8ff';
+  brCtx.fillStyle = '#000';
+  brCtx.fillRect(0,0,BR_W,BR_H);
+  brCtx.fillStyle = accent;
+  brBricks.forEach(b => { if(b.alive) brCtx.fillRect(b.x, b.y, b.w, b.h); });
+  brCtx.fillStyle = '#eaf6ff';
+  brCtx.fillRect(brPaddle.x, brPaddle.y, brPaddle.w, brPaddle.h);
+  brCtx.fillStyle = '#ffe066';
+  brCtx.beginPath();
+  brCtx.arc(brBall.x, brBall.y, brBall.r, 0, 7);
+  brCtx.fill();
+}
+breakoutReset();
+setInterval(() => { stepBreakout(); drawBreakout(); }, 16);
 </script>
 </body>
 </html>
